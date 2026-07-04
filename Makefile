@@ -4,13 +4,10 @@ help:
 	@echo "Socio - Development Commands"
 	@echo "============================"
 	@echo ""
+	@echo "make backend      Run backend on :8080"
+	@echo "make frontend     Run frontend on :3000 (Chrome)"
 	@echo "make db-up        Start PostgreSQL container"
 	@echo "make db-reset     Reset database (drop & recreate)"
-	@echo "make backend-dev  Run backend with hot reload (requires air)"
-	@echo "make backend-run  Run backend directly"
-	@echo "make backend-build Build backend binary"
-	@echo "make up           Start all services with docker-compose"
-	@echo "make down         Stop all services"
 	@echo "make tidy         Tidy Go modules"
 	@echo "make test         Run backend tests"
 	@echo "make clean        Clean build artifacts"
@@ -22,20 +19,11 @@ db-reset:
 	docker compose down -v postgres
 	docker compose up -d postgres
 
-backend-dev:
+backend:
 	cd backend && go run ./cmd/server
 
-backend-run:
-	cd backend && go build -o bin/server ./cmd/server && ./bin/server
-
-backend-build:
-	cd backend && go build -o bin/server ./cmd/server
-
-up:
-	docker compose up -d
-
-down:
-	docker compose down
+frontend:
+	cd frontend && npm install && npx expo start --web --port 3000
 
 tidy:
 	cd backend && go mod tidy
