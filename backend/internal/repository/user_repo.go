@@ -19,11 +19,11 @@ func NewUserRepo(pool *pgxpool.Pool) *UserRepo {
 
 func (r *UserRepo) Create(ctx context.Context, user *models.User) error {
 	return r.pool.QueryRow(ctx, `
-		INSERT INTO users (email, password_hash, full_name, avatar_url, email_verified,
+		INSERT INTO users (email, full_name, avatar_url, email_verified,
 			verification_token, verification_token_expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, updated_at
-	`, user.Email, user.PasswordHash, user.FullName, user.AvatarURL, user.EmailVerified,
+	`, user.Email, user.FullName, user.AvatarURL, user.EmailVerified,
 		user.VerificationToken, user.VerificationTokenExpiresAt,
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 }
@@ -31,12 +31,12 @@ func (r *UserRepo) Create(ctx context.Context, user *models.User) error {
 func (r *UserRepo) FindByEmail(ctx context.Context, email string) (*models.User, error) {
 	user := &models.User{}
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, email, password_hash, full_name, avatar_url, email_verified,
+		SELECT id, email, full_name, avatar_url, email_verified,
 			verification_token, verification_token_expires_at, refresh_token_hash,
 			created_at, updated_at
 		FROM users WHERE email = $1
 	`, email).Scan(
-		&user.ID, &user.Email, &user.PasswordHash, &user.FullName, &user.AvatarURL,
+		&user.ID, &user.Email, &user.FullName, &user.AvatarURL,
 		&user.EmailVerified, &user.VerificationToken, &user.VerificationTokenExpiresAt,
 		&user.RefreshTokenHash, &user.CreatedAt, &user.UpdatedAt,
 	)
@@ -49,12 +49,12 @@ func (r *UserRepo) FindByEmail(ctx context.Context, email string) (*models.User,
 func (r *UserRepo) FindByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	user := &models.User{}
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, email, password_hash, full_name, avatar_url, email_verified,
+		SELECT id, email, full_name, avatar_url, email_verified,
 			verification_token, verification_token_expires_at, refresh_token_hash,
 			created_at, updated_at
 		FROM users WHERE id = $1
 	`, id).Scan(
-		&user.ID, &user.Email, &user.PasswordHash, &user.FullName, &user.AvatarURL,
+		&user.ID, &user.Email, &user.FullName, &user.AvatarURL,
 		&user.EmailVerified, &user.VerificationToken, &user.VerificationTokenExpiresAt,
 		&user.RefreshTokenHash, &user.CreatedAt, &user.UpdatedAt,
 	)
@@ -67,12 +67,12 @@ func (r *UserRepo) FindByID(ctx context.Context, id uuid.UUID) (*models.User, er
 func (r *UserRepo) FindByVerificationToken(ctx context.Context, token string) (*models.User, error) {
 	user := &models.User{}
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, email, password_hash, full_name, avatar_url, email_verified,
+		SELECT id, email, full_name, avatar_url, email_verified,
 			verification_token, verification_token_expires_at, refresh_token_hash,
 			created_at, updated_at
 		FROM users WHERE verification_token = $1 AND verification_token_expires_at > $2
 	`, token, time.Now()).Scan(
-		&user.ID, &user.Email, &user.PasswordHash, &user.FullName, &user.AvatarURL,
+		&user.ID, &user.Email, &user.FullName, &user.AvatarURL,
 		&user.EmailVerified, &user.VerificationToken, &user.VerificationTokenExpiresAt,
 		&user.RefreshTokenHash, &user.CreatedAt, &user.UpdatedAt,
 	)
@@ -110,12 +110,12 @@ func (r *UserRepo) UpdateRefreshTokenHash(ctx context.Context, id uuid.UUID, has
 func (r *UserRepo) FindByRefreshTokenHash(ctx context.Context, hash string) (*models.User, error) {
 	user := &models.User{}
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, email, password_hash, full_name, avatar_url, email_verified,
+		SELECT id, email, full_name, avatar_url, email_verified,
 			verification_token, verification_token_expires_at, refresh_token_hash,
 			created_at, updated_at
 		FROM users WHERE refresh_token_hash = $1
 	`, hash).Scan(
-		&user.ID, &user.Email, &user.PasswordHash, &user.FullName, &user.AvatarURL,
+		&user.ID, &user.Email, &user.FullName, &user.AvatarURL,
 		&user.EmailVerified, &user.VerificationToken, &user.VerificationTokenExpiresAt,
 		&user.RefreshTokenHash, &user.CreatedAt, &user.UpdatedAt,
 	)

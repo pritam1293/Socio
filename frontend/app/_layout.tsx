@@ -59,6 +59,7 @@ function AppShell() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="activity" />
       <Stack.Screen name="connect-accounts" />
+      <Stack.Screen name="verify-email" />
       <Stack.Screen name="index" />
     </Stack>
   );
@@ -127,6 +128,7 @@ function DesktopRoot() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="activity" />
             <Stack.Screen name="connect-accounts" />
+            <Stack.Screen name="verify-email" />
             <Stack.Screen name="index" />
             </Stack>
         </View>

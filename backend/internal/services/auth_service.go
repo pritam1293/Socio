@@ -14,16 +14,15 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/pritam/socio-backend/internal/models"
 	"github.com/pritam/socio-backend/internal/repository"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthService struct {
-	userRepo     *repository.UserRepo
-	jwtSecret    []byte
-	accessTTL    time.Duration
-	refreshTTL   time.Duration
-	appURL       string
-	frontendURL  string
+	userRepo    *repository.UserRepo
+	jwtSecret   []byte
+	accessTTL   time.Duration
+	refreshTTL  time.Duration
+	appURL      string
+	frontendURL string
 	emailService *EmailService
 }
 
@@ -54,17 +53,11 @@ func (s *AuthService) Register(ctx context.Context, req *models.RegisterRequest)
 		return nil, fmt.Errorf("failed to check existing user: %w", err)
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, fmt.Errorf("failed to hash password: %w", err)
-	}
-
 	verificationToken := generateToken(64)
-	expiresAt := time.Now().Add(24 * time.Hour)
+	expiresAt := time.Now().Add(15 * time.Minute)
 
 	user := &models.User{
 		Email:                       req.Email,
-		PasswordHash:                string(hash),
 		FullName:                    req.FullName,
 		EmailVerified:               false,
 		VerificationToken:           &verificationToken,
@@ -75,7 +68,7 @@ func (s *AuthService) Register(ctx context.Context, req *models.RegisterRequest)
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	verifyLink := fmt.Sprintf("%s/api/v1/auth/verify?token=%s", s.appURL, verificationToken)
+	verifyLink := fmt.Sprintf("%s/verify-email?token=%s", s.frontendURL, verificationToken)
 	if err := s.emailService.SendVerificationEmail(req.Email, req.FullName, verifyLink); err != nil {
 		log.Printf("[WARN] failed to send verification email to %s: %v", req.Email, err)
 	}
@@ -91,7 +84,7 @@ func (s *AuthService) Register(ctx context.Context, req *models.RegisterRequest)
 	return user, nil
 }
 
-func (s *AuthService) ResendVerification(ctx context.Context, email string) error {
+func (s *AuthService) RequestLogin(ctx context.Context, email string) error {
 	user, err := s.userRepo.FindByEmail(ctx, email)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -100,54 +93,37 @@ func (s *AuthService) ResendVerification(ctx context.Context, email string) erro
 		return fmt.Errorf("failed to find user: %w", err)
 	}
 
-	if user.EmailVerified {
-		return fmt.Errorf("email is already verified")
-	}
-
 	token := generateToken(64)
-	expiresAt := time.Now().Add(24 * time.Hour)
+	expiresAt := time.Now().Add(15 * time.Minute)
 
 	if err := s.userRepo.UpdateVerificationToken(ctx, user.ID, token, expiresAt); err != nil {
-		return fmt.Errorf("failed to update verification token: %w", err)
+		return fmt.Errorf("failed to update login token: %w", err)
 	}
 
-	verifyLink := fmt.Sprintf("%s/api/v1/auth/verify?token=%s", s.appURL, token)
-	if err := s.emailService.SendVerificationEmail(email, user.FullName, verifyLink); err != nil {
-		log.Printf("[WARN] failed to resend verification email to %s: %v", email, err)
-		return fmt.Errorf("failed to send verification email")
+	loginLink := fmt.Sprintf("%s/verify-email?token=%s", s.frontendURL, token)
+	if err := s.emailService.SendLoginEmail(email, loginLink); err != nil {
+		log.Printf("[WARN] failed to send login email to %s: %v", email, err)
+		return fmt.Errorf("failed to send login email")
 	}
 
 	return nil
 }
 
-func (s *AuthService) VerifyEmail(ctx context.Context, token string) error {
+func (s *AuthService) VerifyAndLogin(ctx context.Context, token string) (*models.AuthResponse, error) {
 	user, err := s.userRepo.FindByVerificationToken(ctx, token)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return fmt.Errorf("invalid or expired verification token")
-		}
-		return fmt.Errorf("failed to find user: %w", err)
-	}
-
-	return s.userRepo.MarkVerified(ctx, user.ID)
-}
-
-func (s *AuthService) Login(ctx context.Context, req *models.LoginRequest) (*models.AuthResponse, error) {
-	user, err := s.userRepo.FindByEmail(ctx, req.Email)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("invalid email or password")
+			return nil, fmt.Errorf("invalid or expired link")
 		}
 		return nil, fmt.Errorf("failed to find user: %w", err)
 	}
 
-	if !user.EmailVerified {
-		return nil, fmt.Errorf("email not verified, please check your inbox")
-	}
+	wasVerified := user.EmailVerified
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		return nil, fmt.Errorf("invalid email or password")
+	if err := s.userRepo.MarkVerified(ctx, user.ID); err != nil {
+		return nil, fmt.Errorf("failed to verify: %w", err)
 	}
+	user.EmailVerified = true
 
 	tokens, err := s.generateTokenPair(user.ID)
 	if err != nil {
@@ -159,11 +135,41 @@ func (s *AuthService) Login(ctx context.Context, req *models.LoginRequest) (*mod
 		return nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
+	log.Printf("[INFO] user %s %s via magic link", user.Email, func() string {
+		if wasVerified { return "logged in" }
+		return "verified and logged in"
+	}())
+
 	return &models.AuthResponse{
 		User:         *user,
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
 	}, nil
+}
+
+func (s *AuthService) ResendVerification(ctx context.Context, email string) error {
+	user, err := s.userRepo.FindByEmail(ctx, email)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return fmt.Errorf("no account found with this email")
+		}
+		return fmt.Errorf("failed to find user: %w", err)
+	}
+
+	token := generateToken(64)
+	expiresAt := time.Now().Add(15 * time.Minute)
+
+	if err := s.userRepo.UpdateVerificationToken(ctx, user.ID, token, expiresAt); err != nil {
+		return fmt.Errorf("failed to update verification token: %w", err)
+	}
+
+	verifyLink := fmt.Sprintf("%s/verify-email?token=%s", s.frontendURL, token)
+	if err := s.emailService.SendVerificationEmail(email, user.FullName, verifyLink); err != nil {
+		log.Printf("[WARN] failed to resend verification email to %s: %v", email, err)
+		return fmt.Errorf("failed to send verification email")
+	}
+
+	return nil
 }
 
 func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*models.TokenPair, error) {

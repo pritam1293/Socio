@@ -33,9 +33,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "registration successful, please check your email for verification link",
 		"user": gin.H{
-			"id":         user.ID,
-			"email":      user.Email,
-			"full_name":  user.FullName,
+			"id":        user.ID,
+			"email":     user.Email,
+			"full_name": user.FullName,
 		},
 	})
 }
@@ -47,43 +47,28 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	if err := h.authService.VerifyEmail(c.Request.Context(), token); err != nil {
+	resp, err := h.authService.VerifyAndLogin(c.Request.Context(), token)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "email verified successfully, you can now log in"})
+	c.JSON(http.StatusOK, resp)
 }
 
-func (h *AuthHandler) ResendVerification(c *gin.Context) {
-	var req models.ResendVerificationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.authService.ResendVerification(c.Request.Context(), req.Email); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "verification email resent"})
-}
-
-func (h *AuthHandler) Login(c *gin.Context) {
+func (h *AuthHandler) RequestLogin(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	resp, err := h.authService.Login(c.Request.Context(), &req)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+	if err := h.authService.RequestLogin(c.Request.Context(), req.Email); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, gin.H{"message": "check your email for the magic link"})
 }
 
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
@@ -112,8 +97,17 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
 }
 
-func (h *AuthHandler) Me(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	_ = userID
-	c.JSON(http.StatusOK, gin.H{"message": "profile endpoint"})
+func (h *AuthHandler) ResendVerification(c *gin.Context) {
+	var req models.ResendVerificationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.authService.ResendVerification(c.Request.Context(), req.Email); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "verification email resent"})
 }

@@ -1,19 +1,21 @@
 import { apiPost, apiGet, saveTokens, clearTokens, getAccessToken, tryRefreshToken } from './api';
 import { AuthResponse } from '../types';
 
-export async function login(email: string, password: string): Promise<AuthResponse> {
-  const data = await apiPost('/auth/login', { email, password }, false);
+export async function requestLogin(email: string) {
+  return apiPost('/auth/request-login', { email }, false);
+}
+
+export async function register(email: string, fullName: string) {
+  return apiPost('/auth/register', { email, full_name: fullName }, false);
+}
+
+export async function verifyAndLogin(token: string): Promise<AuthResponse> {
+  const data = await apiGet(`/auth/verify?token=${token}`, false);
   const res = data as AuthResponse;
-  await saveTokens(res.access_token, res.refresh_token);
+  if (res.access_token) {
+    await saveTokens(res.access_token, res.refresh_token);
+  }
   return res;
-}
-
-export async function register(email: string, password: string, fullName: string) {
-  return apiPost('/auth/register', { email, password, full_name: fullName }, false);
-}
-
-export async function verifyEmail(token: string) {
-  return apiGet(`/auth/verify?token=${token}`, false);
 }
 
 export async function resendVerification(email: string) {

@@ -9,21 +9,17 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string) => Promise<void>;
+  login: (email: string) => Promise<void>;
+  register: (email: string, fullName: string) => Promise<void>;
   logout: () => Promise<void>;
+  setUserDirectly: (u: User) => Promise<void>;
   clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
-  error: null,
-  login: async () => {},
-  register: async () => {},
-  logout: async () => {},
-  clearError: () => {},
+  user: null, isAuthenticated: false, isLoading: true, error: null,
+  login: async () => {}, register: async () => {}, logout: async () => {},
+  setUserDirectly: async () => {}, clearError: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -36,7 +32,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const saved = await getUser();
         const token = await getAccessToken();
-
         if (saved && token) {
           setUser(saved as User);
           authService.checkAuth().catch(() => {});
@@ -47,32 +42,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    setIsLoading(true);
+  const login = useCallback(async (email: string) => {
     setError(null);
     try {
-      const res = await authService.login(email, password);
-      setUser(res.user);
-      await saveUser(res.user);
-    } catch (e: any) {
-      setError(e.message || 'Login failed');
-      throw e;
-    } finally {
-      setIsLoading(false);
-    }
+      await authService.requestLogin(email);
+    } catch (e: any) { setError(e.message || 'Login failed'); throw e; }
   }, []);
 
-  const register = useCallback(async (email: string, password: string, fullName: string) => {
-    setIsLoading(true);
+  const register = useCallback(async (email: string, fullName: string) => {
     setError(null);
-    try {
-      await authService.register(email, password, fullName);
-    } catch (e: any) {
-      setError(e.message || 'Registration failed');
-      throw e;
-    } finally {
-      setIsLoading(false);
-    }
+    try { await authService.register(email, fullName); }
+    catch (e: any) { setError(e.message || 'Registration failed'); throw e; }
   }, []);
 
   const logout = useCallback(async () => {
@@ -81,10 +61,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const setUserDirectly = useCallback(async (u: User) => {
+    setUser(u);
+    await saveUser(u);
+  }, []);
+
   const clearError = useCallback(() => setError(null), []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, error, login, register, logout, clearError }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, error, login, register, logout, setUserDirectly, clearError }}>
       {children}
     </AuthContext.Provider>
   );

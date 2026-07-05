@@ -53,6 +53,30 @@ func (s *EmailService) SendVerificationEmail(to, name, verifyLink string) error 
 	return s.send(to, subject, body)
 }
 
+func (s *EmailService) SendLoginEmail(to, loginLink string) error {
+	subject := "Sign in to Socio"
+	body := fmt.Sprintf(`
+		<html>
+		<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+			<h2>Sign in to Socio</h2>
+			<p>Click the link below to sign in to your account:</p>
+			<p>
+				<a href="%s" style="background: #4F46E5; color: white; padding: 12px 24px;
+					text-decoration: none; border-radius: 6px; display: inline-block;">
+					Sign In to Socio
+				</a>
+			</p>
+			<p>Or copy and paste this link:</p>
+			<p>%s</p>
+			<p>This link expires in 24 hours.</p>
+			<p>If you did not request this, please ignore this email.</p>
+		</body>
+		</html>
+	`, loginLink, loginLink)
+
+	return s.send(to, subject, body)
+}
+
 func (s *EmailService) send(to, subject, body string) error {
 	headers := map[string]string{
 		"From":         s.from,

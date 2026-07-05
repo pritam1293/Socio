@@ -99,8 +99,8 @@ func main() {
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.GET("/verify", authHandler.VerifyEmail)
+			auth.POST("/request-login", authHandler.RequestLogin)
 			auth.POST("/resend-verification", authHandler.ResendVerification)
-			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.RefreshToken)
 		}
 
@@ -108,7 +108,6 @@ func main() {
 		protected.Use(middleware.AuthMiddleware(authService))
 		{
 			protected.POST("/auth/logout", authHandler.Logout)
-			protected.GET("/auth/me", authHandler.Me)
 
 			protected.GET("/social/connect", socialHandler.ConnectURL)
 			protected.GET("/social/:platform/callback", socialHandler.Callback)
