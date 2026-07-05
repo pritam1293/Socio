@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User } from '../types';
 import * as authService from '../services/auth';
+import { saveUser, getUser, clearUser } from '../services/storage';
 
 interface AuthContextType {
   user: User | null;
@@ -31,11 +32,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const loggedIn = await authService.checkAuth();
-      if (loggedIn) {
-        setUser({ id: '', email: '', full_name: '', email_verified: true, avatar_url: null, created_at: '', updated_at: '' });
+      try {
+        const loggedIn = await authService.checkAuth();
+        if (loggedIn) {
+          const saved = await getUser();
+          if (saved) {
+            setUser(saved as User);
+          } else {
+            setUser({ id: '', email: '', full_name: '', email_verified: true, avatar_url: null, created_at: '', updated_at: '' });
+          }
+        }
+      } catch {} finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     })();
   }, []);
 
@@ -45,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await authService.login(email, password);
       setUser(res.user);
+      await saveUser(res.user);
     } catch (e: any) {
       setError(e.message || 'Login failed');
       throw e;
@@ -68,24 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await authService.logout();
+    await clearUser();
     setUser(null);
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isLoading,
-        error,
-        login,
-        register,
-        logout,
-        clearError,
-      }}
-    >
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, error, login, register, logout, clearError }}>
       {children}
     </AuthContext.Provider>
   );

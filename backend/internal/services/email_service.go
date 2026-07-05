@@ -25,6 +25,10 @@ func NewEmailService(host, port, username, password, from string) *EmailService 
 	}
 }
 
+func (s *EmailService) IsConfigured() bool {
+	return s.smtpHost != "" && s.username != "" && s.password != ""
+}
+
 func (s *EmailService) SendVerificationEmail(to, name, verifyLink string) error {
 	subject := "Verify your Socio account"
 	body := fmt.Sprintf(`

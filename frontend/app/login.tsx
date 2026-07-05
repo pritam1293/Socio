@@ -1,28 +1,28 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Animated, Alert, KeyboardAvoidingView,
   Platform, useWindowDimensions,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import { resendVerification } from '../services/auth';
 
-const CARD_MAX_WIDTH = 420;
+const CARD_MAX_WIDTH = 440;
 
 export default function LoginScreen() {
   const { login, register, isLoading } = useAuth();
   const { colors, mode, toggleTheme } = useTheme();
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const { width: screenW } = useWindowDimensions();
   const cardW = Math.min(screenW - 48, CARD_MAX_WIDTH);
   const toggleW = (cardW - 40 - 6) / 2;
 
-  const [tab, setTab] = useState<'signin' | 'signup'>('signin');
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const fadeSignin = useRef(new Animated.Value(1)).current;
-  const fadeSignup = useRef(new Animated.Value(0)).current;
+  const [tab, setTab] = useState<'signin' | 'signup'>(params.tab === 'signup' ? 'signup' : 'signin');
+  const slideAnim = useRef(new Animated.Value(params.tab === 'signup' ? 1 : 0)).current;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,14 +34,15 @@ export default function LoginScreen() {
   const [registered, setRegistered] = useState(false);
   const [regEmail, setRegEmail] = useState('');
 
+  const [resendCooldown, setResendCooldown] = useState(45);
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   function switchTab(to: 'signin' | 'signup') {
     if (to === tab) return;
     const target = to === 'signup' ? 1 : 0;
-    Animated.parallel([
-      Animated.spring(slideAnim, { toValue: target, useNativeDriver: false, friction: 9, tension: 120 }),
-      Animated.timing(fadeSignin, { toValue: to === 'signin' ? 1 : 0, duration: 180, useNativeDriver: true }),
-      Animated.timing(fadeSignup, { toValue: to === 'signup' ? 1 : 0, duration: 180, useNativeDriver: true }),
-    ]).start();
+    Animated.spring(slideAnim, { toValue: target, useNativeDriver: false, friction: 9, tension: 120 }).start();
     setTab(to);
   }
 
@@ -60,11 +61,45 @@ export default function LoginScreen() {
     catch (e: any) { Alert.alert('', e.message); }
   }
 
+  function startCooldown() {
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    setResendCooldown(45);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current!);
+          cooldownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+  useEffect(() => {
+    if (registered) startCooldown();
+    return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
+  }, [registered]);
+
+  async function handleResend() {
+    setResending(true);
+    setResendMsg(null);
+    try {
+      await resendVerification(regEmail);
+      setResendMsg({ text: 'Verification email resent successfully.', ok: true });
+      startCooldown();
+    } catch (e: any) {
+      setResendMsg({ text: e.message || 'Failed to resend', ok: false });
+    } finally {
+      setResending(false);
+    }
+  }
+
   if (registered) {
     return (
       <View style={[vrf.full, { backgroundColor: colors.background }]}>
         <ThemeToggle mode={mode} onPress={toggleTheme} colors={colors} />
-        <View style={[vrf.centered, { width: cardW }]}>
+        <View style={[vrf.centered, vrf.verifyScreen, { width: cardW }]}>
           <View style={[vrf.verifyCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
             <Text style={vrf.verifyIcon}>📧</Text>
             <Text style={[vrf.verifyTitle, { color: colors.text }]}>Check Your Email</Text>
@@ -73,9 +108,39 @@ export default function LoginScreen() {
               <Text style={{ fontWeight: '700', color: colors.accent }}>{regEmail}</Text>
             </Text>
             <Text style={[vrf.verifyHint, { color: colors.textMuted }]}>
-              Click the link to activate your account.
+              Click the link in the email to activate your account.
             </Text>
-            <TouchableOpacity style={[vrf.outlineBtn, { borderColor: colors.border }]} onPress={() => { setRegistered(false); setTab('signin'); }}>
+
+            {/* divider */}
+            <View style={[vrf.divider, { backgroundColor: colors.border }]} />
+
+            <Text style={[vrf.resendTitle, { color: colors.text }]}>Didn't receive the email?</Text>
+
+            {resendMsg && (
+              <Text style={[vrf.resendMsg, { color: resendMsg.ok ? colors.success : colors.error }]}>
+                {resendMsg.text}
+              </Text>
+            )}
+
+            {resendCooldown > 0 ? (
+              <View style={[vrf.cooldownBtn, { borderColor: colors.border }]}>
+                <Text style={{ color: colors.textMuted, fontSize: 14, fontWeight: '600' }}>
+                  Resend available in {resendCooldown}s
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[vrf.resendBtn, { backgroundColor: colors.accent }, resending && { opacity: 0.5 }]}
+                onPress={handleResend}
+                disabled={resending}
+              >
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>
+                  {resending ? 'Sending…' : 'Resend Verification Email'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity style={[vrf.outlineBtn, { borderColor: colors.border, marginTop: 12 }]} onPress={() => { setRegistered(false); setTab('signin'); setResendMsg(null); }}>
               <Text style={{ color: colors.textSecondary, fontWeight: '600', fontSize: 14 }}>Back to Sign In</Text>
             </TouchableOpacity>
           </View>
@@ -111,46 +176,40 @@ export default function LoginScreen() {
             </View>
 
             <View style={vrf.formStage}>
-              {/* ---- SIGN IN ---- */}
-              <Animated.View
-                style={[vrf.formPanel, { opacity: fadeSignin, position: tab === 'signin' ? 'relative' : 'absolute' }]}
-                pointerEvents={tab === 'signin' ? 'auto' : 'none'}
-              >
-                <TextInput style={[vrf.input, inputColor]} value={tab === 'signin' ? email : ''} onChangeText={setEmail} placeholder="Email address" placeholderTextColor={colors.textMuted} keyboardType="email-address" autoCapitalize="none" />
-                <View style={vrf.gap} />
-                <View style={vrf.passRow}>
-                  <TextInput style={[vrf.input, vrf.passFlex, inputColor]} value={tab === 'signin' ? password : ''} onChangeText={setPassword} placeholder="Password" placeholderTextColor={colors.textMuted} secureTextEntry={!showPass} />
-                  <PasswordToggle visible={showPass} onPress={() => setShowPass(!showPass)} color={colors.text} />
+              {tab === 'signin' ? (
+                <View style={vrf.formPanel}>
+                  <TextInput style={[vrf.input, inputColor]} value={email} onChangeText={setEmail} placeholder="Email address" placeholderTextColor={colors.textMuted} keyboardType="email-address" autoCapitalize="none" />
+                  <View style={vrf.gap} />
+                  <View style={vrf.passRow}>
+                    <TextInput style={[vrf.input, vrf.passFlex, inputColor]} value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor={colors.textMuted} secureTextEntry={!showPass} />
+                    <PasswordToggle visible={showPass} onPress={() => setShowPass(!showPass)} color={colors.text} />
+                  </View>
+                  <View style={vrf.gap} />
+                  <TouchableOpacity style={[vrf.submit, { backgroundColor: colors.accent }, isLoading && { opacity: 0.5 }]} onPress={handleSignIn} disabled={isLoading}>
+                    <Text style={vrf.submitText}>{isLoading ? 'Signing in…' : 'Sign In'}</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={vrf.gap} />
-                <TouchableOpacity style={[vrf.submit, { backgroundColor: colors.accent }, isLoading && { opacity: 0.5 }]} onPress={handleSignIn} disabled={isLoading}>
-                  <Text style={vrf.submitText}>{isLoading ? 'Signing in…' : 'Sign In'}</Text>
-                </TouchableOpacity>
-              </Animated.View>
-
-              {/* ---- SIGN UP ---- */}
-              <Animated.View
-                style={[vrf.formPanel, { opacity: fadeSignup, position: tab === 'signup' ? 'relative' : 'absolute', top: 0, left: 0, right: 0 }]}
-                pointerEvents={tab === 'signup' ? 'auto' : 'none'}
-              >
-                <TextInput style={[vrf.input, inputColor]} value={tab === 'signup' ? fullName : ''} onChangeText={setFullName} placeholder="Full name" placeholderTextColor={colors.textMuted} autoCapitalize="words" />
-                <View style={vrf.gap} />
-                <TextInput style={[vrf.input, inputColor]} value={tab === 'signup' ? email : ''} onChangeText={setEmail} placeholder="Email address" placeholderTextColor={colors.textMuted} keyboardType="email-address" autoCapitalize="none" />
-                <View style={vrf.gap} />
-                <View style={vrf.passRow}>
-                  <TextInput style={[vrf.input, vrf.passFlex, inputColor]} value={tab === 'signup' ? password : ''} onChangeText={setPassword} placeholder="Password (min. 8 chars)" placeholderTextColor={colors.textMuted} secureTextEntry={!showSignupPass} />
-                  <PasswordToggle visible={showSignupPass} onPress={() => setShowSignupPass(!showSignupPass)} color={colors.text} />
+              ) : (
+                <View style={vrf.formPanel}>
+                  <TextInput style={[vrf.input, inputColor]} value={fullName} onChangeText={setFullName} placeholder="Full name" placeholderTextColor={colors.textMuted} autoCapitalize="words" />
+                  <View style={vrf.gap} />
+                  <TextInput style={[vrf.input, inputColor]} value={email} onChangeText={setEmail} placeholder="Email address" placeholderTextColor={colors.textMuted} keyboardType="email-address" autoCapitalize="none" />
+                  <View style={vrf.gap} />
+                  <View style={vrf.passRow}>
+                    <TextInput style={[vrf.input, vrf.passFlex, inputColor]} value={password} onChangeText={setPassword} placeholder="Password (min. 8 chars)" placeholderTextColor={colors.textMuted} secureTextEntry={!showSignupPass} />
+                    <PasswordToggle visible={showSignupPass} onPress={() => setShowSignupPass(!showSignupPass)} color={colors.text} />
+                  </View>
+                  <View style={vrf.gap} />
+                  <View style={vrf.passRow}>
+                    <TextInput style={[vrf.input, vrf.passFlex, inputColor]} value={confirmPass} onChangeText={setConfirmPass} placeholder="Confirm password" placeholderTextColor={colors.textMuted} secureTextEntry={!showConfirmPass} />
+                    <PasswordToggle visible={showConfirmPass} onPress={() => setShowConfirmPass(!showConfirmPass)} color={colors.text} />
+                  </View>
+                  <View style={vrf.gap} />
+                  <TouchableOpacity style={[vrf.submit, { backgroundColor: colors.accent }, isLoading && { opacity: 0.5 }]} onPress={handleSignUp} disabled={isLoading}>
+                    <Text style={vrf.submitText}>{isLoading ? 'Creating account…' : 'Create Account'}</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={vrf.gap} />
-                <View style={vrf.passRow}>
-                  <TextInput style={[vrf.input, vrf.passFlex, inputColor]} value={tab === 'signup' ? confirmPass : ''} onChangeText={setConfirmPass} placeholder="Confirm password" placeholderTextColor={colors.textMuted} secureTextEntry={!showConfirmPass} />
-                  <PasswordToggle visible={showConfirmPass} onPress={() => setShowConfirmPass(!showConfirmPass)} color={colors.text} />
-                </View>
-                <View style={vrf.gap} />
-                <TouchableOpacity style={[vrf.submit, { backgroundColor: colors.accent }, isLoading && { opacity: 0.5 }]} onPress={handleSignUp} disabled={isLoading}>
-                  <Text style={vrf.submitText}>{isLoading ? 'Creating account…' : 'Create Account'}</Text>
-                </TouchableOpacity>
-              </Animated.View>
+              )}
             </View>
           </View>
 
@@ -241,5 +300,11 @@ const vrf = StyleSheet.create({
   verifyTitle: { fontSize: 18, fontWeight: '800', marginBottom: 8 },
   verifyBody: { fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 6 },
   verifyHint: { fontSize: 12, marginBottom: 18 },
+  verifyScreen: { flex: 1, justifyContent: 'center' },
+  divider: { width: '100%', height: 1, marginBottom: 16 },
+  resendTitle: { fontSize: 14, fontWeight: '600', marginBottom: 10 },
+  resendMsg: { fontSize: 12, textAlign: 'center', marginBottom: 8 },
+  cooldownBtn: { borderWidth: 1, paddingVertical: 11, borderRadius: 8, alignItems: 'center' },
+  resendBtn: { paddingVertical: 11, borderRadius: 8, alignItems: 'center' },
   outlineBtn: { borderWidth: 1, paddingVertical: 10, paddingHorizontal: 22, borderRadius: 8 },
 });

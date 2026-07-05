@@ -16,6 +16,10 @@ export async function verifyEmail(token: string) {
   return apiGet(`/auth/verify?token=${token}`, false);
 }
 
+export async function resendVerification(email: string) {
+  return apiPost('/auth/resend-verification', { email }, false);
+}
+
 export async function logout() {
   try {
     await apiPost('/auth/logout');

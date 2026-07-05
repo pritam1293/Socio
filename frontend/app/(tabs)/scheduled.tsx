@@ -10,7 +10,7 @@ export default function ScheduledScreen() {
 
   useEffect(() => { loadPosts('scheduled'); }, []);
 
-  if (!isLoading && posts.length === 0) {
+  if (!isLoading && (!posts || posts.length === 0)) {
     return (
       <View style={[st.empty, { backgroundColor: colors.background }]}>
         <Text style={st.emptyIcon}>📅</Text>

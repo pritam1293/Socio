@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -76,10 +77,47 @@ func (s *AuthService) Register(ctx context.Context, req *models.RegisterRequest)
 
 	verifyLink := fmt.Sprintf("%s/api/v1/auth/verify?token=%s", s.appURL, verificationToken)
 	if err := s.emailService.SendVerificationEmail(req.Email, req.FullName, verifyLink); err != nil {
-		return nil, fmt.Errorf("user created but failed to send verification email: %w", err)
+		log.Printf("[WARN] failed to send verification email to %s: %v", req.Email, err)
+	}
+
+	if !s.emailService.IsConfigured() {
+		log.Printf("[INFO] SMTP not configured, auto-verifying user %s", req.Email)
+		if err := s.userRepo.MarkVerified(ctx, user.ID); err != nil {
+			log.Printf("[WARN] failed to auto-verify user %s: %v", req.Email, err)
+		}
+		user.EmailVerified = true
 	}
 
 	return user, nil
+}
+
+func (s *AuthService) ResendVerification(ctx context.Context, email string) error {
+	user, err := s.userRepo.FindByEmail(ctx, email)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return fmt.Errorf("no account found with this email")
+		}
+		return fmt.Errorf("failed to find user: %w", err)
+	}
+
+	if user.EmailVerified {
+		return fmt.Errorf("email is already verified")
+	}
+
+	token := generateToken(64)
+	expiresAt := time.Now().Add(24 * time.Hour)
+
+	if err := s.userRepo.UpdateVerificationToken(ctx, user.ID, token, expiresAt); err != nil {
+		return fmt.Errorf("failed to update verification token: %w", err)
+	}
+
+	verifyLink := fmt.Sprintf("%s/api/v1/auth/verify?token=%s", s.appURL, token)
+	if err := s.emailService.SendVerificationEmail(email, user.FullName, verifyLink); err != nil {
+		log.Printf("[WARN] failed to resend verification email to %s: %v", email, err)
+		return fmt.Errorf("failed to send verification email")
+	}
+
+	return nil
 }
 
 func (s *AuthService) VerifyEmail(ctx context.Context, token string) error {

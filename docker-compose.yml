@@ -38,7 +38,7 @@ services:
       SMTP_PASSWORD: "${SMTP_PASSWORD}"
       SMTP_FROM: "${SMTP_FROM}"
       APP_URL: "http://localhost:8080"
-      FRONTEND_URL: "http://localhost:3000"
+      FRONTEND_URL: "http://localhost:8081"
       TWITTER_CLIENT_ID: "${TWITTER_CLIENT_ID:-}"
       TWITTER_CLIENT_SECRET: "${TWITTER_CLIENT_SECRET:-}"
       TWITTER_CALLBACK_URL: "http://localhost:8080/api/v1/social/twitter/callback"

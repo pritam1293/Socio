@@ -32,7 +32,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       const data = await postService.getPosts({ status });
-      setPosts(data.posts);
+      setPosts(data.posts || []);
     } catch (e: any) {
       setError(e.message);
     } finally {

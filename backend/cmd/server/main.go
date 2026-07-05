@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -98,6 +99,7 @@ func main() {
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.GET("/verify", authHandler.VerifyEmail)
+			auth.POST("/resend-verification", authHandler.ResendVerification)
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.RefreshToken)
 		}
@@ -128,6 +130,10 @@ func main() {
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "socio"})
+	})
+
+	router.GET("/favicon.ico", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
 	})
 
 	srv := &http.Server{
@@ -163,10 +169,21 @@ func main() {
 
 func corsMiddleware(frontendURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", frontendURL)
+		origin := c.GetHeader("Origin")
+		if origin == "" {
+			origin = frontendURL
+		}
+
+		allowedOrigin := frontendURL
+		if strings.HasPrefix(origin, "http://localhost:") {
+			allowedOrigin = origin
+		}
+
+		c.Header("Access-Control-Allow-Origin", allowedOrigin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
 		c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Vary", "Origin")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)

@@ -29,3 +29,19 @@ export async function deleteItem(key: string): Promise<void> {
   }
   return SecureStore.deleteItemAsync(key);
 }
+
+const USER_KEY = 'user_data';
+
+export async function saveUser(user: object): Promise<void> {
+  return setItem(USER_KEY, JSON.stringify(user));
+}
+
+export async function getUser(): Promise<object | null> {
+  const raw = await getItem(USER_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+export async function clearUser(): Promise<void> {
+  return deleteItem(USER_KEY);
+}

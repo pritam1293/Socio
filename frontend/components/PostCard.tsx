@@ -42,7 +42,7 @@ export default function PostCard({ post, onTap }: Props) {
           {post.caption}
         </Text>
       ) : null}
-      {post.hashtags.length > 0 && (
+      {post.hashtags && post.hashtags.length > 0 && (
         <View style={cardStyles.hashtags}>
           {post.hashtags.map((tag, i) => (
             <Text key={i} style={[cardStyles.hashtag, { color: colors.accent }]}>#{tag}</Text>
@@ -50,7 +50,7 @@ export default function PostCard({ post, onTap }: Props) {
         </View>
       )}
       <View style={cardStyles.platforms}>
-        {post.platforms.map((p) => {
+        {post.platforms && post.platforms.map((p) => {
           const icon = p.platform === 'twitter' ? '@' : p.platform === 'reddit' ? 'r/' : 'T';
           const pColor = p.status === 'published' ? colors.success : p.status === 'failed' ? colors.error : colors.textMuted;
           return <Text key={p.id} style={{ fontSize: 18, fontWeight: '700', color: pColor }}>{icon}</Text>;

@@ -91,6 +91,15 @@ func (r *UserRepo) MarkVerified(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+func (r *UserRepo) UpdateVerificationToken(ctx context.Context, id uuid.UUID, token string, expiresAt time.Time) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE users SET verification_token = $2, verification_token_expires_at = $3,
+			updated_at = NOW()
+		WHERE id = $1
+	`, id, token, expiresAt)
+	return err
+}
+
 func (r *UserRepo) UpdateRefreshTokenHash(ctx context.Context, id uuid.UUID, hash *string) error {
 	_, err := r.pool.Exec(ctx, `
 		UPDATE users SET refresh_token_hash = $2, updated_at = NOW() WHERE id = $1
