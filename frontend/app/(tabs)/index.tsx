@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, useWindowDimensions, Platform } from 'react-native';
 import { useDashboard } from '../../contexts/DashboardContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import PostCard from '../../components/PostCard';
@@ -10,7 +10,7 @@ export default function DashboardScreen() {
   const { data, isLoading, loadDashboard } = useDashboard();
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
-  const isWide = width > 768;
+  const isDesktop = Platform.OS === 'web' && width >= 1024;
   const contentW = Math.min(width - 32, DESKTOP_MAX);
 
   useEffect(() => { loadDashboard(); }, []);
@@ -22,22 +22,22 @@ export default function DashboardScreen() {
       refreshControl={<RefreshControl refreshing={isLoading} onRefresh={loadDashboard} tintColor={colors.accent} />}
     >
       <View style={{ width: contentW }}>
-        <Text style={[s.appName, { color: colors.accent }]}>Socio</Text>
+        {!isDesktop && <Text style={[s.appName, { color: colors.accent }]}>Socio</Text>}
         {data && <>
-          <View style={[s.statsRow, isWide && s.statsWide]}>
+          <View style={[s.statsRow, isDesktop && s.statsWide]}>
             <StatCard label="Drafts" value={data.overview?.drafts ?? 0} colors={colors} />
             <StatCard label="Scheduled" value={data.overview?.scheduled ?? 0} colors={colors} />
             <StatCard label="Published" value={data.overview?.published ?? 0} colors={colors} />
             <StatCard label="Failed" value={data.overview?.failed ?? 0} colors={colors} />
           </View>
-          <View style={[s.sectionsWrap, isWide && s.sectionsHorizontal]}>
-            <View style={isWide ? { flex: 1 } : undefined}>
+          <View style={[s.sectionsWrap, isDesktop && s.sectionsHorizontal]}>
+            <View style={isDesktop ? { flex: 1 } : undefined}>
               <Text style={[s.sectionTitle, { color: colors.text }]}>Upcoming Posts</Text>
               {!data.upcoming || data.upcoming.length === 0
                 ? <EmptyCard icon="📅" text="No upcoming posts" subtitle="Schedule posts to publish later" colors={colors} />
                 : data.upcoming.map((p) => <PostCard key={p.id} post={p} />)}
             </View>
-            <View style={isWide ? { flex: 1 } : undefined}>
+            <View style={isDesktop ? { flex: 1 } : undefined}>
               <Text style={[s.sectionTitle, { color: colors.text }]}>Recent Published</Text>
               {!data.published || data.published.length === 0
                 ? <EmptyCard icon="📄" text="No published posts yet" colors={colors} />

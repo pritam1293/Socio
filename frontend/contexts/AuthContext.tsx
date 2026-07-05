@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User } from '../types';
 import * as authService from '../services/auth';
+import { getAccessToken } from '../services/api';
 import { saveUser, getUser, clearUser } from '../services/storage';
 
 interface AuthContextType {
@@ -33,14 +34,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const loggedIn = await authService.checkAuth();
-        if (loggedIn) {
-          const saved = await getUser();
-          if (saved) {
-            setUser(saved as User);
-          } else {
-            setUser({ id: '', email: '', full_name: '', email_verified: true, avatar_url: null, created_at: '', updated_at: '' });
-          }
+        const saved = await getUser();
+        const token = await getAccessToken();
+
+        if (saved && token) {
+          setUser(saved as User);
+          authService.checkAuth().catch(() => {});
         }
       } catch {} finally {
         setIsLoading(false);
