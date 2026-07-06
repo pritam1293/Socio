@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, useWindowDimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, Platform } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../contexts/ThemeContext';
+import { useToast } from '../contexts/ToastContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as SocialService from '../services/social';
 import { SocialAccount } from '../types';
@@ -13,14 +15,35 @@ const PLATFORMS = [
 
 export default function ConnectAccountsScreen() {
   const { colors } = useTheme();
+  const toast = useToast();
+  const params = useLocalSearchParams<{ connected?: string; username?: string; error?: string }>();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [shownToast, setShownToast] = useState(false);
   const { width } = useWindowDimensions();
   const isDesktop = Platform.OS === 'web' && width >= 1024;
 
+  useEffect(() => {
+    if (shownToast) return;
+    if (params.connected && params.username) {
+      toast.success(`Successfully connected your X account (@${params.username}).`);
+      setShownToast(true);
+      if (Platform.OS === 'web') {
+        window.history.replaceState({}, '', '/connect-accounts');
+      }
+    } else if (params.error) {
+      const msg = params.error.replace(/\+/g, ' ');
+      toast.error(`Connection failed: ${msg}. Please try again.`);
+      setShownToast(true);
+      if (Platform.OS === 'web') {
+        window.history.replaceState({}, '', '/connect-accounts');
+      }
+    }
+  }, [params.connected, params.username, params.error, shownToast]);
+
   async function load() {
     try { setAccounts(await SocialService.getConnectedAccounts()); }
-    catch (e: any) { Alert.alert('Error', e.message); }
+    catch (e: any) { toast.error(e.message || 'Something went wrong. Please try again.'); }
     finally { setLoading(false); }
   }
 
@@ -29,18 +52,20 @@ export default function ConnectAccountsScreen() {
   async function connect(platform: string) {
     try {
       const url = await SocialService.getConnectUrl(platform);
-      Alert.alert('Connect', `Open in browser:\n\n${url}`);
-    } catch (e: any) { Alert.alert('Error', e.message); }
+      if (Platform.OS === 'web') {
+        window.location.href = url;
+      }
+    } catch (e: any) { toast.error(e.message || 'Something went wrong. Please try again.'); }
   }
 
   async function disconnect(account: SocialAccount) {
-    Alert.alert('Disconnect', `Disconnect ${account.platform}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Disconnect', style: 'destructive', onPress: async () => {
-        try { await SocialService.disconnectAccount(account.id); setAccounts(prev => prev.filter(a => a.id !== account.id)); }
-        catch (e: any) { Alert.alert('Error', e.message); }
-      }},
-    ]);
+    try {
+      await SocialService.disconnectAccount(account.id);
+      setAccounts(prev => prev.filter(a => a.id !== account.id));
+      toast.success(`Disconnected ${account.platform}.`);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to disconnect. Please try again.');
+    }
   }
 
   return (
@@ -93,16 +118,8 @@ const cs = StyleSheet.create({
   sub: { fontSize: 13, marginBottom: 24, lineHeight: 20 },
   grid: { gap: 16 },
   gridWide: { flexDirection: 'row', flexWrap: 'wrap' },
-  card: {
-    flex: 1, minWidth: 200, maxWidth: 320,
-    borderRadius: 14, borderWidth: 1,
-    padding: 24, alignItems: 'center',
-  },
-  platformBadge: {
-    width: 56, height: 56, borderRadius: 16,
-    justifyContent: 'center', alignItems: 'center',
-    marginBottom: 14,
-  },
+  card: { flex: 1, minWidth: 200, maxWidth: 320, borderRadius: 14, borderWidth: 1, padding: 24, alignItems: 'center' },
+  platformBadge: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
   platformName: { fontSize: 15, fontWeight: '700', marginBottom: 8 },
   statusDot: { width: 8, height: 8, borderRadius: 4, marginBottom: 4 },
   statusText: { fontSize: 12, fontWeight: '500', marginBottom: 16 },

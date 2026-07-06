@@ -7,6 +7,7 @@ import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { PostProvider } from '../contexts/PostContext';
 import { DashboardProvider, useDashboard } from '../contexts/DashboardContext';
+import { ToastProvider } from '../contexts/ToastContext';
 
 const SB_W = 244;
 const RP_W = 300;
@@ -22,10 +23,12 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <PostProvider>
-          <DashboardProvider>
-            <StatusBar style="auto" />
-            <AppShell />
-          </DashboardProvider>
+      <DashboardProvider>
+        <ToastProvider>
+          <StatusBar style="auto" />
+          <AppShell />
+        </ToastProvider>
+      </DashboardProvider>
         </PostProvider>
       </AuthProvider>
     </ThemeProvider>

@@ -68,7 +68,7 @@ func (h *AuthHandler) RequestLogin(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "check your email for the magic link"})
+	c.JSON(http.StatusOK, gin.H{"message": "check your email for the verification link"})
 }
 
 func (h *AuthHandler) RefreshToken(c *gin.Context) {

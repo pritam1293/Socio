@@ -135,7 +135,7 @@ func (s *AuthService) VerifyAndLogin(ctx context.Context, token string) (*models
 		return nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
-	log.Printf("[INFO] user %s %s via magic link", user.Email, func() string {
+	log.Printf("[INFO] user %s %s via verification link", user.Email, func() string {
 		if wasVerified { return "logged in" }
 		return "verified and logged in"
 	}())

@@ -1,18 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Animated, Alert, KeyboardAvoidingView,
+  ScrollView, Animated, KeyboardAvoidingView,
   Platform, useWindowDimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useToast } from '../contexts/ToastContext';
 import { requestLogin, resendVerification } from '../services/auth';
 
 const CARD_MAX_WIDTH = 440;
 
 export default function LoginScreen() {
   const { register } = useAuth();
+  const toast = useToast();
   const [submitting, setSubmitting] = useState(false);
   const { colors, mode, toggleTheme } = useTheme();
   const router = useRouter();
@@ -35,6 +37,7 @@ export default function LoginScreen() {
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const emailRef = useRef<TextInput>(null);
 
   function switchTab(to: 'signin' | 'signup') {
     if (to === tab) return;
@@ -45,26 +48,26 @@ export default function LoginScreen() {
   const sliderX = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, toggleW] });
 
   async function handleSignIn() {
-    if (!email.trim()) { Alert.alert('', 'Enter your email'); return; }
+    if (!email.trim()) { toast.error('Enter your email'); return; }
     setSubmitting(true);
     try {
       await requestLogin(email.trim());
       setSentEmail(email.trim());
       setSentMode('signin');
       setSent(true);
-    } catch (e: any) { Alert.alert('', e.message); }
+    } catch (e: any) { toast.error(e.message || 'Something went wrong.'); }
     finally { setSubmitting(false); }
   }
 
   async function handleSignUp() {
-    if (!fullName.trim() || !email.trim()) { Alert.alert('', 'Fill in all fields'); return; }
+    if (!fullName.trim() || !email.trim()) { toast.error('Fill in all fields'); return; }
     setSubmitting(true);
     try {
       await register(email.trim(), fullName.trim());
       setSentEmail(email.trim());
       setSentMode('signup');
       setSent(true);
-    } catch (e: any) { Alert.alert('', e.message); }
+    } catch (e: any) { toast.error(e.message || 'Something went wrong.'); }
     finally { setSubmitting(false); }
   }
 
@@ -103,7 +106,7 @@ export default function LoginScreen() {
             <Text style={vrf.verifyIcon}>📧</Text>
             <Text style={[vrf.verifyTitle, { color: colors.text }]}>Check Your Email</Text>
             <Text style={[vrf.verifyBody, { color: colors.textSecondary }]}>
-              {sentMode === 'signup' ? 'A verification link was sent to' : 'A magic link was sent to'}{' '}
+              A verification link was sent to{' '}
               <Text style={{ fontWeight: '700', color: colors.accent }}>{sentEmail}</Text>
             </Text>
             <Text style={[vrf.verifyHint, { color: colors.textMuted }]}>
@@ -164,8 +167,8 @@ export default function LoginScreen() {
 
             {tab === 'signin' ? (
               <View style={vrf.formPanel}>
-                <Text style={[vrf.hint, { color: colors.textMuted }]}>Enter your email and we'll send you a magic link.</Text>
-                <TextInput style={[vrf.input, inputColor]} value={email} onChangeText={setEmail} placeholder="Email address" placeholderTextColor={colors.textMuted} keyboardType="email-address" autoCapitalize="none" />
+                <Text style={[vrf.hint, { color: colors.textMuted }]}>Enter your email and we'll send you a verification link.</Text>
+                <TextInput style={[vrf.input, inputColor]} value={email} onChangeText={setEmail} placeholder="Email address" placeholderTextColor={colors.textMuted} keyboardType="email-address" autoCapitalize="none" returnKeyType="go" onSubmitEditing={handleSignIn} />
                 <View style={vrf.gap} />
                 <TouchableOpacity style={[vrf.submit, { backgroundColor: colors.accent }, submitting && { opacity: 0.5 }]} onPress={handleSignIn} disabled={submitting}>
                   <Text style={vrf.submitText}>{submitting ? 'Sending…' : 'Continue with Email'}</Text>
@@ -174,9 +177,9 @@ export default function LoginScreen() {
             ) : (
               <View style={vrf.formPanel}>
                 <Text style={[vrf.hint, { color: colors.textMuted }]}>Create your account. No password needed.</Text>
-                <TextInput style={[vrf.input, inputColor]} value={fullName} onChangeText={setFullName} placeholder="Full name" placeholderTextColor={colors.textMuted} autoCapitalize="words" />
+                <TextInput style={[vrf.input, inputColor]} value={fullName} onChangeText={setFullName} placeholder="Full name" placeholderTextColor={colors.textMuted} autoCapitalize="words" returnKeyType="next" onSubmitEditing={() => emailRef.current?.focus()} />
                 <View style={vrf.gap} />
-                <TextInput style={[vrf.input, inputColor]} value={email} onChangeText={setEmail} placeholder="Email address" placeholderTextColor={colors.textMuted} keyboardType="email-address" autoCapitalize="none" />
+                <TextInput ref={emailRef} style={[vrf.input, inputColor]} value={email} onChangeText={setEmail} placeholder="Email address" placeholderTextColor={colors.textMuted} keyboardType="email-address" autoCapitalize="none" returnKeyType="go" onSubmitEditing={handleSignUp} />
                 <View style={vrf.gap} />
                 <TouchableOpacity style={[vrf.submit, { backgroundColor: colors.accent }, submitting && { opacity: 0.5 }]} onPress={handleSignUp} disabled={submitting}>
                   <Text style={vrf.submitText}>{submitting ? 'Creating…' : 'Create Account'}</Text>

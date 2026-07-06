@@ -84,7 +84,7 @@ func main() {
 
 	authHandler := handlers.NewAuthHandler(authService)
 	postHandler := handlers.NewPostHandler(postService)
-	socialHandler := handlers.NewSocialHandler(socialRepo, cryptoService, providers)
+	socialHandler := handlers.NewSocialHandler(socialRepo, cryptoService, providers, cfg.FrontendURL)
 	mediaHandler := handlers.NewMediaHandler(mediaRepo, "uploads")
 
 	uploadDir := "uploads"
@@ -104,13 +104,14 @@ func main() {
 			auth.POST("/refresh", authHandler.RefreshToken)
 		}
 
+		api.GET("/social/:platform/callback", socialHandler.Callback)
+
 		protected := api.Group("")
 		protected.Use(middleware.AuthMiddleware(authService))
 		{
 			protected.POST("/auth/logout", authHandler.Logout)
 
 			protected.GET("/social/connect", socialHandler.ConnectURL)
-			protected.GET("/social/:platform/callback", socialHandler.Callback)
 			protected.GET("/social/accounts", socialHandler.ListAccounts)
 			protected.DELETE("/social/accounts/:id", socialHandler.Disconnect)
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -55,6 +56,8 @@ func (p *TwitterProvider) GetAuthURL(state, codeChallenge string) string {
 }
 
 func (p *TwitterProvider) ExchangeCode(ctx context.Context, code, codeVerifier string) (*platform.TokenResult, error) {
+	log.Printf("[TWITTER] exchanging authorization code, code_len=%d verifier_len=%d", len(code), len(codeVerifier))
+
 	data := url.Values{}
 	data.Set("code", code)
 	data.Set("grant_type", "authorization_code")
