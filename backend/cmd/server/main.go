@@ -18,6 +18,7 @@ import (
 	"github.com/pritam/socio-backend/internal/middleware"
 	"github.com/pritam/socio-backend/internal/platform"
 	"github.com/pritam/socio-backend/internal/platform/twitter"
+	"github.com/pritam/socio-backend/internal/platform/reddit"
 	"github.com/pritam/socio-backend/internal/repository"
 	"github.com/pritam/socio-backend/internal/services"
 )
@@ -64,6 +65,12 @@ func main() {
 	if cfg.TwitterClientID != "" {
 		providers["twitter"] = twitter.NewTwitterProvider(
 			cfg.TwitterClientID, cfg.TwitterSecret, cfg.TwitterCallback,
+		)
+	}
+
+	if cfg.RedditClientID != "" {
+		providers["reddit"] = reddit.NewRedditProvider(
+			cfg.RedditClientID, cfg.RedditSecret, cfg.RedditCallback,
 		)
 	}
 
